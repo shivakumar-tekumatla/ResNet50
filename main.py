@@ -1,3 +1,12 @@
+"""
+Using the ResNet from scratch from the followign Youtube Tutorial.
+https://www.youtube.com/watch?v=DkNIBBBvcPs&ab_channel=AladdinPersson
+For predicting the age form a given image, we can use the same ResNet acrchitecture that is presented in the original ResNet paper with some changes
+
+One main change is , we need to add one more layer to the ResNet that can predict the age. I am using Linear regression after ResNet predicts
+some classes. 
+
+"""
 import torch 
 import torch.nn as nn
 import numpy as np
@@ -102,7 +111,7 @@ class RMSELoss(nn.Module):
         loss = torch.sqrt(self.mse(yhat,y) + self.eps)
         return loss
 
-def ResNet50(img_channels=1,num_classes=1000):
+def ResNet50(img_channels=1,num_classes=1024):
 
     return ResNet(block,[3,4,6,3],img_channels,num_classes)
 
@@ -162,7 +171,8 @@ def train_model(model,criterion,optimizer,X_tr,ytr,X_va,yva,epochs,batch_size):
             torch.cuda.empty_cache()
             gc.collect()
             n+=batch_size
-        print ('Epoch [{}/{}], Train Loss: {:.4f}'.format(epoch+1, epochs, loss.item()))
+        train_loss = loss.item()
+        # print ('Epoch [{}/{}], Train Loss: {:.4f}'.format(epoch+1, epochs, loss.item()))
         output = model(X_va)
         loss = criterion(output,yva)
         optimizer.zero_grad()
@@ -170,9 +180,7 @@ def train_model(model,criterion,optimizer,X_tr,ytr,X_va,yva,epochs,batch_size):
         optimizer.step()
         torch.cuda.empty_cache()
         gc.collect()
-        print ('Epoch [{}/{}], Validation Loss: {:.4f}'.format(epoch+1, epochs, loss.item()))
-
-
+        print ('Epoch [{}/{}], Train Loss: {:.4f} \t Validation Loss: {:.4f}'.format(epoch+1, epochs, train_loss,loss.item()))
     return
 def test_model(model,criterion,optimizer,X_te,yte):
     output = model(X_te)
@@ -199,47 +207,17 @@ def main():
     X = np.load("facesAndAges/faces.npy")
     y = np.load("facesAndAges/ages.npy") 
     X_tr,ytr,X_va,yva,X_te,yte  = split_data(X,y)
-    print(ytr)
     #hyper parameters 
-    epochs = 20
-    batch_size = 512
-    learning_rate = 0.01 
+    epochs = 50
+    batch_size = 256
     print("loading model....!")
     model = ResNet50()#.to(device)
     # loss function 
     criterion = RMSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay = 0.001, momentum = 0.9)  
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, weight_decay = 0.001, momentum = 0.9)  
     print("Training the model...!")
     train_model(model,criterion,optimizer,X_tr,ytr,X_va,yva,epochs,batch_size)
-    # print("Computing output....!")
-    # output = model(X_va)
-    # # print(output)
-    # # print(yva)
-    # loss = criterion(output,yva)
-    # print(loss)
-    # optimizer.zero_grad()
-    # loss.backward()
-    # optimizer.step()
-    # torch.cuda.empty_cache()
-    # print("Computing output again....!")
-    # output = model(X_va)
-    # # print(output)
-    # # print(yva)
-    # loss = criterion(output,yva)
-    # print(loss)
-    # optimizer.zero_grad()
-    # loss.backward()
-    # optimizer.step()
-    # torch.cuda.empty_cache()
-
-
-
-
-
-
-    
-    # y = mdoel(X_tr)
-    # print(y.shape)
+    test_model(model,criterion,optimizer,X_te,yte)
 
     pass
 if __name__ == "__main__":
