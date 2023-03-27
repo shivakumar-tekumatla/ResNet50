@@ -11,12 +11,13 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torchvision import transforms, datasets
+from torchsummary import summary
 import matplotlib.pyplot as plt
 import pickle
 import os 
 import gc
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
+np.random.seed(9)
 class block(nn.Module):
     def __init__(self,in_channels,out_channels,identity_down_sample = None,stride=1) -> None:
         super(block,self).__init__()
@@ -111,14 +112,14 @@ class RMSELoss(nn.Module):
         loss = torch.sqrt(self.mse(yhat,y) + self.eps)
         return loss
 
-def ResNet50(img_channels=1,num_classes=1024):
+def ResNet50(img_channels=1,num_classes=100):
 
     return ResNet(block,[3,4,6,3],img_channels,num_classes)
 
-# def ResNet101(img_channels =3,num_classes =1000):
-#     return ResNet(block,[3,4,23,3],img_channels,num_classes)
-# def ResNet152(img_channels =3,num_classes =1000):
-#     return ResNet(block,[3,8,36,3],img_channels,num_classes)
+def ResNet101(img_channels =1,num_classes =100):
+    return ResNet(block,[3,4,23,3],img_channels,num_classes)
+def ResNet152(img_channels =1,num_classes =100):
+    return ResNet(block,[3,8,36,3],img_channels,num_classes)
 
 def split_data(X,y,train_split=0.2,validation_split=0.1):
     print("Splitting the data....!")
@@ -145,15 +146,15 @@ def split_data(X,y,train_split=0.2,validation_split=0.1):
         for img in data:
             img = transform_X(img)
             data_conv.append(img)
-        return torch.stack(data_conv).float()
+        return torch.stack(data_conv).float().to(device)
     y= torch.from_numpy(y).float()
     y = y.reshape((-1,1))
     X_tr = convert_tensor(X[train_part])
-    ytr = y[train_part]
+    ytr = y[train_part].to(device)
     X_va = convert_tensor(X[validation_part])
-    yva = y[validation_part]
+    yva = y[validation_part].to(device)
     X_te = convert_tensor(X[test_part])
-    yte = y[test_part]
+    yte = y[test_part].to(device)
     return X_tr,ytr,X_va,yva,X_te,yte
 
 def train_model(model,criterion,optimizer,X_tr,ytr,X_va,yva,epochs,batch_size):
@@ -190,31 +191,18 @@ def test_model(model,criterion,optimizer,X_te,yte):
     print ('Test Loss: {:.4f}'.format(loss.item()))
     return
 def main():
-    # we do not need to split the data each time
-    # check if it already available
-    # else reload the data and split
-    # if os.path.exists("data.pickle"):
-    #     print("Data file exists...!")
-    #     with open('data.pickle', 'rb') as file:
-    #         X_tr,ytr,X_va,yva,X_te,yte = pickle.load(file)
-    # else:
-    #     X = np.load("facesAndAges/faces.npy")
-    #     y = np.load("facesAndAges/ages.npy") 
-    #     A = split_data(X,y)
-    #     X_tr,ytr,X_va,yva,X_te,yte  = A
-    #     with open('data.pickle', 'wb') as handle:
-    #         pickle.dump(A, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    X = np.load("facesAndAges/faces.npy")
-    y = np.load("facesAndAges/ages.npy") 
+    X = np.load("faces.npy")
+    y = np.load("ages.npy") 
     X_tr,ytr,X_va,yva,X_te,yte  = split_data(X,y)
     #hyper parameters 
-    epochs = 50
+    epochs = 10
     batch_size = 256
     print("loading model....!")
-    model = ResNet50()#.to(device)
+    model = ResNet50().to(device)
+    print(summary(model,X_tr.shape[1:]))
     # loss function 
     criterion = RMSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, weight_decay = 0.001, momentum = 0.9)  
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, weight_decay = 0.01, momentum = 0.9)  
     print("Training the model...!")
     train_model(model,criterion,optimizer,X_tr,ytr,X_va,yva,epochs,batch_size)
     test_model(model,criterion,optimizer,X_te,yte)
